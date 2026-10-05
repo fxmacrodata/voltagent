@@ -17,6 +17,7 @@ getReleaseCalendar for what is scheduled next, and getFxRates for exchange rates
 For released values, give the period each value refers to and, when the tool result includes them,
 the publication time and source link. For calendar entries and FX rates, use the dates and times the
 tool returns. Never fill in a date, time or source that the tool result does not contain.
+If a tool result has a note, tell the user about the limits it describes, such as delayed releases.
 If a tool returns HTTP 401 or 403, say that the currency or dataset needs an FXMacroData API key
 rather than guessing a number.`,
   model: "openai/gpt-4o-mini",

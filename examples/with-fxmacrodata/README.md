@@ -86,4 +86,4 @@ The agent runs on the default VoltAgent server port and exposes one agent named 
 
 ## Notes
 
-Each tool returns `{ success: true, data }` with the API payload unchanged in `data`, or `{ success: false, error }`, so the agent sees units, source links and data-quality fields as published. Redirects are refused, so the key header is only ever sent to `api.fxmacrodata.com`, and the key is removed from error text. Responses are not cached; the keyless tier has a fair-use allowance of 100 requests per day.
+Each tool returns `{ success: true, data }` with the API payload unchanged in `data`, or `{ success: false, error }`, so the agent sees units, source links and data-quality fields as published. Without a key, `getIndicatorHistory` results also carry a `note` saying releases are delayed by 15 minutes and limited to the last 90 days; it quotes the API's `freemium_delay` and `freemium_window` messages, which also stay in `data`. Redirects are refused, so the key header is only ever sent to `api.fxmacrodata.com`, and the key is removed from error text. Responses are not cached; the keyless tier has a fair-use allowance of 100 requests per day.

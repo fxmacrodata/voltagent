@@ -9,9 +9,13 @@ type FXMacroDataQueryParams = Record<string, number | string | undefined>;
 type FXMacroDataResult = {
   data?: unknown;
   error?: string;
+  note?: string;
   status?: number;
   success: boolean;
 };
+
+const KEYLESS_RELEASES_NOTE =
+  "No FXMacroData API key is set: releases are limited to USD from the last 90 days and are delayed by 15 minutes, so a release published in the last 15 minutes is not included. Do not present the newest row as real time; real-time releases need an API key.";
 
 const currencySchema = z.string().regex(/^[A-Za-z]{3}$/, "Use a three-letter ISO currency code.");
 
@@ -172,6 +176,34 @@ export async function callFXMacroData(
 }
 
 /**
+ * Builds the note added to keyless release results. It uses the API's own freemium_delay and
+ * freemium_window messages when the response carries them, and says how many recent releases
+ * were withheld, so the model does not present delayed data as current.
+ */
+export function keylessReleasesNote(data: unknown): string {
+  const body = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {};
+  const field = (name: string): Record<string, unknown> | undefined => {
+    const value = body[name];
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  };
+  const delay = field("freemium_delay");
+  const freemiumWindow = field("freemium_window");
+  const parts = [KEYLESS_RELEASES_NOTE];
+  for (const message of [delay?.message, freemiumWindow?.message]) {
+    if (typeof message === "string" && message.trim()) {
+      parts.push(message.trim());
+    }
+  }
+  const withheld = delay?.withheld_count;
+  if (typeof withheld === "number" && withheld > 0) {
+    parts.push(`${withheld} release(s) published in the last 15 minutes were withheld.`);
+  }
+  return parts.join(" ");
+}
+
+/**
  * Lists the indicator slugs available for a currency.
  */
 export const listIndicatorsTool = createTool({
@@ -190,7 +222,7 @@ export const listIndicatorsTool = createTool({
 export const getIndicatorHistoryTool = createTool({
   name: "getIndicatorHistory",
   description:
-    "Fetch released values for one indicator (for example inflation, policy_rate, gdp, unemployment) with the date each value refers to, when it was published, and the official source link. Without an API key only USD releases from the last 90 days are available.",
+    "Fetch released values for one indicator (for example inflation, policy_rate, gdp, unemployment) with the date each value refers to, when it was published, and the official source link. Without an API key only USD releases from the last 90 days are available, each readable 15 minutes after publication, and the result carries a note saying so; real-time releases need an API key.",
   parameters: z.object({
     currency: currencySchema.describe('Three-letter currency code, such as "usd".'),
     indicator: slugSchema.describe(
@@ -200,11 +232,16 @@ export const getIndicatorHistoryTool = createTool({
     endDate: dateSchema.describe("Optional end date, YYYY-MM-DD."),
     limit: z.number().int().min(1).max(100).optional().describe("Maximum rows to return."),
   }),
-  execute: async ({ currency, indicator, startDate, endDate, limit = 12 }) =>
-    callFXMacroData(
+  execute: async ({ currency, indicator, startDate, endDate, limit = 12 }) => {
+    const result = await callFXMacroData(
       `/announcements/${code(currency)}/${encodeURIComponent(indicator.trim().toLowerCase())}`,
       { start_date: startDate, end_date: endDate, limit },
-    ),
+    );
+    if (result.success && !readApiKey().key) {
+      return { ...result, note: keylessReleasesNote(result.data) };
+    }
+    return result;
+  },
 });
 
 /**
