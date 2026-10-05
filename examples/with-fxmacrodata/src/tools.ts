@@ -22,10 +22,21 @@ function code(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/**
+ * True when a YYYY-MM-DD string is a real calendar date (rejects 2025-02-31).
+ */
+function isCalendarDate(value: string): boolean {
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.")
+  .refine(isCalendarDate, "Not a valid calendar date.")
   .optional();
+
+const slugSchema = z.string().trim().min(1);
 
 /**
  * Reads FXMACRODATA_API_KEY. The key is optional: USD releases from the last 90 days, the USD
@@ -65,7 +76,19 @@ function shapeError(path: string, data: unknown): string | undefined {
     return `FXMacroData API error: ${String(body.detail ?? body.error)}`;
   }
   if (path.startsWith("/data_catalogue/")) {
-    return undefined;
+    const entries = Object.values(body);
+    const valid =
+      entries.length > 0 &&
+      entries.every(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          !Array.isArray(entry) &&
+          typeof (entry as Record<string, unknown>).name === "string",
+      );
+    return valid
+      ? undefined
+      : "Unexpected response shape: expected catalogue entries keyed by indicator slug.";
   }
   if (!Array.isArray(body.data)) {
     return "Unexpected response shape: expected an object with a 'data' list.";
@@ -169,10 +192,9 @@ export const getIndicatorHistoryTool = createTool({
     "Fetch released values for one indicator (for example inflation, policy_rate, gdp, unemployment) with the date each value refers to, when it was published, and the official source link.",
   parameters: z.object({
     currency: currencySchema.describe('Three-letter currency code, such as "usd".'),
-    indicator: z
-      .string()
-      .min(1)
-      .describe('Indicator slug from listIndicators, such as "inflation" or "policy_rate".'),
+    indicator: slugSchema.describe(
+      'Indicator slug from listIndicators, such as "inflation" or "policy_rate".',
+    ),
     startDate: dateSchema.describe("Optional start date, YYYY-MM-DD."),
     endDate: dateSchema.describe("Optional end date, YYYY-MM-DD."),
     limit: z.number().int().min(1).max(100).optional().describe("Maximum rows to return."),
@@ -193,7 +215,7 @@ export const getReleaseCalendarTool = createTool({
     "Fetch scheduled economic releases for a currency, with release times in UTC and the publisher's local time. Optionally filter to one indicator.",
   parameters: z.object({
     currency: currencySchema.describe('Three-letter currency code, such as "usd".'),
-    indicator: z.string().optional().describe('Optional indicator slug, such as "inflation".'),
+    indicator: slugSchema.optional().describe('Optional indicator slug, such as "inflation".'),
     startDate: dateSchema.describe("Optional start date, YYYY-MM-DD."),
     endDate: dateSchema.describe("Optional end date, YYYY-MM-DD."),
   }),
