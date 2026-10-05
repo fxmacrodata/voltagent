@@ -12,7 +12,7 @@ This example gives a VoltAgent research agent tools for official macroeconomic d
 ## Prerequisites
 
 1. **OpenAI API Key**: Used by the example agent model
-2. **FXMacroData API Key** (optional): USD releases, the USD calendar and the indicator catalogue work without a key. Other currencies and FX rates need one, see [plans](https://fxmacrodata.com/subscribe?utm_source=github&utm_medium=referral&utm_campaign=voltagent&utm_content=readme)
+2. **FXMacroData API Key** (optional): USD releases from the last 90 days, the USD calendar and the indicator catalogue work without a key. Older history, other currencies and FX rates need one, see [plans](https://fxmacrodata.com/subscribe?utm_source=github&utm_medium=referral&utm_campaign=voltagent&utm_content=readme)
 
 ## Setup
 
@@ -82,4 +82,4 @@ The agent runs on the default VoltAgent server port and exposes one agent named 
 
 ## Notes
 
-The tools return the API response unchanged, so the agent sees units, source links and data-quality fields as published. Responses are not cached; the keyless tier has a fair-use allowance of 100 requests per day.
+The tools return the API response unchanged, so the agent sees units, source links and data-quality fields as published. Redirects are refused, so the key header is only ever sent to `api.fxmacrodata.com`, and the key is removed from error text. Responses are not cached; the keyless tier has a fair-use allowance of 100 requests per day.

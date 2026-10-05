@@ -28,15 +28,69 @@ const dateSchema = z
   .optional();
 
 /**
+ * Reads FXMACRODATA_API_KEY. The key is optional: USD releases from the last 90 days, the USD
+ * calendar and the data catalogue answer without one. Other currencies, older history and FX
+ * rates need one. Returns an error string (never containing the key) for a malformed value.
+ */
+function readApiKey(): { key?: string; error?: string } {
+  const key = process.env.FXMACRODATA_API_KEY?.trim();
+  if (!key) {
+    return {};
+  }
+  if (!/^[!-~]+$/.test(key)) {
+    return {
+      error:
+        "FXMACRODATA_API_KEY contains whitespace or non-printable characters; check the value.",
+    };
+  }
+  return { key };
+}
+
+/**
+ * Removes the API key from text that is returned to the model.
+ */
+function redact(text: string, key?: string): string {
+  return key ? text.split(key).join("[redacted]") : text;
+}
+
+/**
+ * Returns an error message when a 200 response is not the shape the endpoint documents.
+ */
+function shapeError(path: string, data: unknown): string | undefined {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return "Unexpected response shape: expected a JSON object.";
+  }
+  const body = data as Record<string, unknown>;
+  if (("detail" in body || "error" in body) && !("data" in body)) {
+    return `FXMacroData API error: ${String(body.detail ?? body.error)}`;
+  }
+  if (path.startsWith("/data_catalogue/")) {
+    return undefined;
+  }
+  if (!Array.isArray(body.data)) {
+    return "Unexpected response shape: expected an object with a 'data' list.";
+  }
+  if (!body.data.every((row) => typeof row === "object" && row !== null && !Array.isArray(row))) {
+    return "Unexpected response shape: 'data' rows must be objects.";
+  }
+  return undefined;
+}
+
+/**
  * Calls a read-only FXMacroData REST endpoint and returns a tool-friendly result.
  *
- * FXMACRODATA_API_KEY is optional: USD releases, the USD calendar and the data
- * catalogue answer without a key. Other currencies and FX rates need one.
+ * Redirects are rejected rather than followed, so the key header is never sent to another
+ * host, and the key is removed from any error text.
  */
 export async function callFXMacroData(
   path: string,
   params: FXMacroDataQueryParams = {},
 ): Promise<FXMacroDataResult> {
+  const { key: apiKey, error: keyError } = readApiKey();
+  if (keyError) {
+    return { success: false, error: keyError };
+  }
+
   const url = new URL(`${FXMACRODATA_BASE_URL}${path}`);
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") {
@@ -45,7 +99,6 @@ export async function callFXMacroData(
   }
 
   const headers: Record<string, string> = { accept: "application/json" };
-  const apiKey = process.env.FXMACRODATA_API_KEY;
   if (apiKey) {
     headers["x-api-key"] = apiKey;
   }
@@ -54,26 +107,41 @@ export async function callFXMacroData(
   const timeout = setTimeout(() => controller.abort(), FXMACRODATA_REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, { headers, method: "GET", signal: controller.signal });
+    const response = await fetch(url, {
+      headers,
+      method: "GET",
+      redirect: "error",
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
       const body = (await response.text()).slice(0, 500);
       return {
         success: false,
         status: response.status,
-        error: `FXMacroData API returned HTTP ${response.status}: ${body || response.statusText}`,
+        error: redact(
+          `FXMacroData API returned HTTP ${response.status}: ${body || response.statusText}`,
+          apiKey,
+        ),
       };
     }
 
-    return {
-      success: true,
-      data: await response.json(),
-    };
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      return { success: false, status: response.status, error: "FXMacroData returned non-JSON." };
+    }
+
+    const problem = shapeError(path, data);
+    if (problem) {
+      return { success: false, status: response.status, error: redact(problem, apiKey) };
+    }
+
+    return { success: true, data };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "FXMacroData request failed.",
-    };
+    const message = error instanceof Error ? error.message : "FXMacroData request failed.";
+    return { success: false, error: redact(message, apiKey) };
   } finally {
     clearTimeout(timeout);
   }
