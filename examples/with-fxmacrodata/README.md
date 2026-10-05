@@ -12,7 +12,7 @@ This example gives a VoltAgent research agent tools for official macroeconomic d
 ## Prerequisites
 
 1. **OpenAI API Key**: Used by the example agent model
-2. **FXMacroData API Key** (optional): USD releases from the last 90 days (each readable 15 minutes after publication), the USD calendar and the indicator catalogue work without a key. Older history, real-time releases, other currencies and FX rates need one, see [plans](https://fxmacrodata.com/subscribe?utm_source=github&utm_medium=referral&utm_campaign=voltagent&utm_content=readme)
+2. **FXMacroData API Key** (optional): without a key, the indicator catalogue works for every currency, and USD releases from the last 90 days (each readable 15 minutes after publication) and the USD release calendar are available. Releases and calendars for other currencies, older USD history, real-time releases and FX rates need a key, see [plans](https://fxmacrodata.com/subscribe?utm_source=github&utm_medium=referral&utm_campaign=voltagent&utm_content=readme)
 
 ## Setup
 
@@ -49,11 +49,13 @@ The agent runs on the default VoltAgent server port and exposes one agent named 
 
 - **Purpose**: List indicator slugs, names, units and sources for a currency
 - **Endpoint**: `GET /v1/data_catalogue/{currency}`
+- **Key**: Not needed, for any currency
 
 ### 2. Get Indicator History
 
 - **Purpose**: Released values for one indicator, newest first
 - **Endpoint**: `GET /v1/announcements/{currency}/{indicator}`
+- **Key**: Not needed for USD releases from the last 90 days; needed for other currencies and older history
 - **Parameters**:
   - `currency`: Three-letter code such as `usd`
   - `indicator`: Slug such as `inflation` or `policy_rate`
@@ -64,14 +66,16 @@ The agent runs on the default VoltAgent server port and exposes one agent named 
 
 - **Purpose**: Scheduled releases for a currency
 - **Endpoint**: `GET /v1/calendar/{currency}`
+- **Key**: Not needed for USD; needed for other currencies
 - **Parameters**:
   - `indicator`: Optional slug filter
   - `startDate`, `endDate`: Optional `YYYY-MM-DD` bounds
 
 ### 4. Get FX Rates
 
-- **Purpose**: Daily rates for a currency pair (needs an API key)
+- **Purpose**: Daily rates for a currency pair
 - **Endpoint**: `GET /v1/forex/{base}/{quote}`
+- **Key**: Needed for every pair
 
 ## Example Prompts
 

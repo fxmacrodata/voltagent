@@ -39,9 +39,10 @@ const dateSchema = z
 const slugSchema = z.string().trim().min(1);
 
 /**
- * Reads FXMACRODATA_API_KEY. The key is optional: USD releases from the last 90 days, the USD
- * calendar and the data catalogue answer without one. Other currencies, older history and FX
- * rates need one. Returns an error string (never containing the key) for a malformed value.
+ * Reads FXMACRODATA_API_KEY. The key is optional: the data catalogue answers for every currency
+ * without one, as do USD releases from the last 90 days and the USD calendar. Releases and
+ * calendars for other currencies, older history and FX rates need one. Returns an error string
+ * (never containing the key) for a malformed value.
  */
 function readApiKey(): { key?: string; error?: string } {
   const key = process.env.FXMACRODATA_API_KEY?.trim();
@@ -176,7 +177,7 @@ export async function callFXMacroData(
 export const listIndicatorsTool = createTool({
   name: "listIndicators",
   description:
-    "List the macroeconomic indicators available for a currency, with names, units and sources. Call this first when you do not know an indicator slug.",
+    "List the macroeconomic indicators available for a currency, with names, units and sources. Call this first when you do not know an indicator slug. Works for every currency without an API key.",
   parameters: z.object({
     currency: currencySchema.describe('Three-letter currency code, such as "usd" or "eur".'),
   }),
@@ -189,7 +190,7 @@ export const listIndicatorsTool = createTool({
 export const getIndicatorHistoryTool = createTool({
   name: "getIndicatorHistory",
   description:
-    "Fetch released values for one indicator (for example inflation, policy_rate, gdp, unemployment) with the date each value refers to, when it was published, and the official source link.",
+    "Fetch released values for one indicator (for example inflation, policy_rate, gdp, unemployment) with the date each value refers to, when it was published, and the official source link. Without an API key only USD releases from the last 90 days are available.",
   parameters: z.object({
     currency: currencySchema.describe('Three-letter currency code, such as "usd".'),
     indicator: slugSchema.describe(
@@ -212,7 +213,7 @@ export const getIndicatorHistoryTool = createTool({
 export const getReleaseCalendarTool = createTool({
   name: "getReleaseCalendar",
   description:
-    "Fetch scheduled economic releases for a currency, with release times in UTC and the publisher's local time. Optionally filter to one indicator.",
+    "Fetch scheduled economic releases for a currency, with release times in UTC and the publisher's local time. Optionally filter to one indicator. Without an API key only the USD calendar is available.",
   parameters: z.object({
     currency: currencySchema.describe('Three-letter currency code, such as "usd".'),
     indicator: slugSchema.optional().describe('Optional indicator slug, such as "inflation".'),
