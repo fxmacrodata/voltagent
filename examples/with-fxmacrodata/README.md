@@ -43,6 +43,8 @@ This example gives a VoltAgent research agent tools for official macroeconomic d
 
 The agent runs on the default VoltAgent server port and exposes one agent named `macroResearchAgent`.
 
+The server binds to `127.0.0.1`, so it is only reachable from your machine. It has no authentication and the agent spends your OpenAI and FXMacroData quota, so add authentication before changing `hostname` in `src/index.ts` to a public interface such as `0.0.0.0`.
+
 ## Tools Available
 
 ### 1. List Indicators

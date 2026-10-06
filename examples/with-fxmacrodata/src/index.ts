@@ -29,5 +29,7 @@ new VoltAgent({
     macroResearchAgent,
   },
   logger,
-  server: honoServer(),
+  // Local example: listen on loopback only. The server has no auth, so do not
+  // bind it to a public interface without adding authentication first.
+  server: honoServer({ hostname: "127.0.0.1" }),
 });
